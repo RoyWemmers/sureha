@@ -1,4 +1,4 @@
-"""Support for Sure Petcare Flap switches."""
+"""Support for Sure Petcare Pet switches."""
 from __future__ import annotations
 
 import logging
@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from surepy.entities import SurepyEntity
-from surepy.entities.devices import Flap as SureFlap
+from surepy.entities.pet import Pet as SurePet
 from surepy.enums import EntityType
 
 from . import SurePetcareAPI
@@ -29,7 +29,7 @@ async def async_setup_entry(
     entities = []
 
     for surepy_entity in spc.coordinator.data.values():
-        if surepy_entity.type in [EntityType.CAT_FLAP, EntityType.PET_FLAP]:
+        if surepy_entity.type == EntityType.PET:
             entities.append(IndoorOnlyModeSwitch(spc.coordinator, surepy_entity.id, spc))
 
     async_add_entities(entities, True)
@@ -45,14 +45,14 @@ class IndoorOnlyModeSwitch(SwitchEntity):
         self._id = _id
         self._spc: SurePetcareAPI = spc
 
-        self._surepy_entity: SureFlap = self._coordinator.data[self._id]
+        self._surepy_entity: SurePet = self._coordinator.data[self._id]
         self._attr_name = f"{self._surepy_entity.name} Indoor Only Mode"
         self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-indoor-only"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self._id)},
             "name": self._surepy_entity.name,
             "manufacturer": "Sure Petcare",
-            "model": self._surepy_entity.type.name.replace("_", " ").title(),
+            "model": "Pet",
         }
 
     @property

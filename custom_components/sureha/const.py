@@ -1,33 +1,26 @@
 """Constants for the Sure Petcare integration."""
+
 DOMAIN = "sureha"
 
 SPC = "spc"
 
-# platforms
-TOPIC_UPDATE = f"{DOMAIN}_data_update"
-
-# sure petcare api
 SURE_API_TIMEOUT = 60
 
-# device info
-SURE_MANUFACTURER = "Sure Petcare"
+ATTR_FLAP_ID = "flap_id"
+ATTR_LOCK_STATE = "lock_state"
+ATTR_PET_ID = "pet_id"
+ATTR_WHERE = "where"
+ATTR_ENABLED = "enabled"
 
-# batteries
 ATTR_VOLTAGE = "voltage"
 ATTR_VOLTAGE_FULL = "voltage_full"
 ATTR_VOLTAGE_LOW = "voltage_low"
+
+SERVICE_SET_LOCK_STATE = "set_lock_state"
+SERVICE_PET_LOCATION = "set_pet_location"
+SERVICE_SET_INDOOR_ONLY_MODE = "set_indoor_only_mode"
+
 SURE_BATT_VOLTAGE_FULL = 6.0
 SURE_BATT_VOLTAGE_LOW = 4.5
-SURE_BATT_VOLTAGE_DIFF = SURE_BATT_VOLTAGE_FULL - SURE_BATT_VOLTAGE_LOW
 
-# services
-SERVICE_SET_LOCK_STATE = "set_lock_state"
-ATTR_FLAP_ID = "flap_id"
-ATTR_LOCK_STATE = "lock_state"
-
-SERVICE_PET_LOCATION = "set_pet_location"
-ATTR_PET_ID = "pet_id"
-ATTR_WHERE = "where"
-
-SERVICE_SET_INDOOR_ONLY_MODE = "set_indoor_only_mode"
-ATTR_ENABLED = "enabled"
+SURE_MANUFACTURER = "Sure Petcare"
