@@ -88,9 +88,12 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         """Return true if indoor only mode is on."""
         try:
-            return bool(self.coordinator.data[self._id].raw_data().get("indoor_only", False))
-        except (KeyError, AttributeError):
-            _LOGGER.warning("Could not get indoor_only state for pet %s", self._id)
+            pet_data = self.coordinator.data[self._id]
+            raw_data = pet_data.raw_data()
+            _LOGGER.debug("Pet %s raw data: %s", self._id, raw_data)
+            return bool(raw_data.get("indoor_only", False))
+        except (KeyError, AttributeError) as err:
+            _LOGGER.warning("Could not get indoor_only state for pet %s: %s", self._id, err)
             return False
 
     async def async_turn_on(self, **kwargs: Any) -> None:

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.device_tracker import SourceType, TrackerEntity
 from homeassistant.config_entries import ConfigEntry
@@ -10,15 +9,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from surepy.entities import EntityType
-from surepy.entities.pet import Pet as SurePet
 from surepy.enums import Location
 
-from . import DOMAIN, SurePetcareAPI
-from .const import SPC
+from . import SurePetcareAPI
+from .const import DOMAIN, SPC
 
 _LOGGER = logging.getLogger(__name__)
-
-SOURCE_TYPE_FLAP = "flap"
 
 
 async def async_setup_entry(
@@ -37,14 +33,15 @@ async def async_setup_entry(
         )
         return
 
-    async_add_entities(
-        [
-            SureDeviceTracker(spc.coordinator, pet.id, spc)
-            for pet in spc.coordinator.data.values()
-            if pet.type == EntityType.PET
-        ],
-        True,
-    )
+    entities = []
+
+    for surepy_entity in spc.coordinator.data.values():
+        if surepy_entity.type == EntityType.PET:
+            entities.append(
+                SureDeviceTracker(spc.coordinator, surepy_entity.id, spc)
+            )
+
+    async_add_entities(entities)
 
 
 class SureDeviceTracker(CoordinatorEntity, TrackerEntity):
