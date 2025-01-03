@@ -1,130 +1,49 @@
-"""Support for Sure PetCare Flaps/Pets sensors."""
+"""Support for Sure Petcare Flap sensors."""
 
 from __future__ import annotations
 
 import logging
-import pprint
-import random
-from typing import Any, cast
+from typing import Any
 
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_VOLTAGE,
-    UnitOfMass,
-    PERCENTAGE,
-    UnitOfVolume,
-)
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from surepy.entities import SurepyEntity
-from surepy.entities.devices import (
-    Feeder as SureFeeder,
-    FeederBowl as SureFeederBowl,
-    Felaqua as SureFelaqua,
-    Flap as SureFlap,
-    SurepyDevice,
-)
-from surepy.enums import EntityType, LockState
+from surepy.entities import EntityType
 
-# pylint: disable=relative-beyond-top-level
 from . import SurePetcareAPI
-from .const import (
-    ATTR_VOLTAGE_FULL,
-    ATTR_VOLTAGE_LOW,
-    DOMAIN,
-    SPC,
-    SURE_BATT_VOLTAGE_FULL,
-    SURE_BATT_VOLTAGE_LOW,
-    SURE_MANUFACTURER,
-)
+from .const import DOMAIN, SPC
 
 _LOGGER = logging.getLogger(__name__)
 
-PARALLEL_UPDATES = 2
-
-
-async def async_setup_platform(
-    hass: HomeAssistant,
-    config: ConfigEntry,
-    async_add_entities: Any,
-    discovery_info: Any = None,
-) -> None:
-    """Set up Sure PetCare sensor platform."""
-    await async_setup_entry(hass, config, async_add_entities)
-
 
 async def async_setup_entry(
-    hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: Any
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up config entry Sure PetCare Flaps sensors."""
+    """Set up Sure Petcare sensors."""
+    _LOGGER.debug("Setting up sensors")
+    try:
+        spc: SurePetcareAPI = hass.data[DOMAIN][config_entry.entry_id][SPC]
+    except KeyError:
+        _LOGGER.error(
+            "Integration not ready yet. Current data: %s",
+            hass.data.get(DOMAIN, {}),
+        )
+        return
 
-    entities: list[Flap | Felaqua | Feeder | FeederBowl | Battery] = []
-
-    spc: SurePetcareAPI = hass.data[DOMAIN][SPC]
+    entities = []
 
     for surepy_entity in spc.coordinator.data.values():
-
-        if surepy_entity.type in [
-            EntityType.CAT_FLAP,
-            EntityType.PET_FLAP,
-        ] and surepy_entity.raw_data().get("status", {}).get("locking"):
-            entities.append(Flap(spc.coordinator, surepy_entity.id, spc))
-
-        elif surepy_entity.type == EntityType.FELAQUA:
-            entities.append(Felaqua(spc.coordinator, surepy_entity.id, spc))
-
-        elif surepy_entity.type == EntityType.FEEDER:
-
-            bowls = {}
-
-            if len(surepy_entity.bowls) > 0:
-                bowls = surepy_entity.bowls.values()
-            else:
-                if surepy_entity.raw_data()["control"].get("bowls"):
-                    bowls = surepy_entity.raw_data()["control"]["bowls"]
-
-            _LOGGER.debug(
-                "%s| bowls (%d): %s",
-                surepy_entity.raw_data()["name"],
-                len(bowls),
-                pprint.pformat(bowls),
-            )
-
-            for bowl in bowls.get("settings", []):
-                entities.append(
-                    FeederBowl(spc.coordinator, surepy_entity.id, spc, bowl)
-                    # FeederBowl(spc.coordinator, surepy_entity.id, spc, bowl.raw_data())
-                )
-
-            entities.append(Feeder(spc.coordinator, surepy_entity.id, spc))
-
-        if surepy_entity.type in [
-            EntityType.CAT_FLAP,
-            EntityType.PET_FLAP,
-            EntityType.FEEDER,
-            EntityType.FELAQUA,
-        ] and surepy_entity.raw_data().get("status", {}).get("battery", {}):
-
-            voltage_batteries_full = cast(
-                float,
-                config_entry.options.get(ATTR_VOLTAGE_FULL, SURE_BATT_VOLTAGE_FULL),
-            )
-            voltage_batteries_low = cast(
-                float, config_entry.options.get(ATTR_VOLTAGE_LOW, SURE_BATT_VOLTAGE_LOW)
-            )
-
+        if surepy_entity.type in [EntityType.CAT_FLAP, EntityType.PET_FLAP]:
             entities.append(
-                Battery(
-                    spc.coordinator,
-                    surepy_entity.id,
-                    spc,
-                    voltage_full=voltage_batteries_full,
-                    voltage_low=voltage_batteries_low,
-                )
+                BatterySensor(spc.coordinator, surepy_entity.id)
             )
 
     async_add_entities(entities)
@@ -372,6 +291,58 @@ class Battery(SurePetcareSensor):
             battery_level = battery.calculate_battery_level(
                 voltage_full=self.voltage_full, voltage_low=self.voltage_low
             )
+
+            # return batterie level between 0 and 100
+            return battery_level
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the additional attrs."""
+
+        attrs = {}
+
+        if (device := cast(SurepyDevice, self._coordinator.data[self._id])) and (
+            state := device.raw_data().get("status")
+        ):
+            self._surepy_entity = device
+
+            voltage = float(state["battery"])
+
+            attrs = {
+                "battery_level": device.battery_level,
+                ATTR_VOLTAGE: f"{voltage:.2f}",
+                f"{ATTR_VOLTAGE}_per_battery": f"{voltage / 4:.2f}",
+            }
+
+        return attrs
+
+
+class BatterySensor(SurePetcareSensor):
+    """Sure Petcare Battery Sensor."""
+
+    def __init__(self, coordinator, _id: int):
+        super().__init__(coordinator, _id, None)
+
+        self._surepy_entity: SurepyDevice
+
+        self._attr_name = f"{self._attr_name} Battery Level"
+
+        self._attr_unit_of_measurement = PERCENTAGE
+        self._attr_device_class = SensorDeviceClass.BATTERY
+        self._attr_unique_id = (
+            f"{self._surepy_entity.household_id}-{self._surepy_entity.id}-battery"
+        )
+
+    @property
+    def state(self) -> int | None:
+        """Return battery level in percent."""
+
+        if battery := cast(SurepyDevice, self._coordinator.data[self._id]):
+
+            self._surepy_entity = battery
+            self.device_class = SensorDeviceClass.BATTERY
+            self.native_unit_of_measurement = PERCENTAGE
+            battery_level = battery.calculate_battery_level()
 
             # return batterie level between 0 and 100
             return battery_level

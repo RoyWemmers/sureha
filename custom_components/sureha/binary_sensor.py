@@ -1,6 +1,7 @@
-"""Support for Sure PetCare Flaps/Pets binary sensors."""
+"""Support for Sure Petcare Flap sensors."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -9,15 +10,17 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from surepy.entities import SurepyEntity
+from surepy.entities import SurepyEntity, EntityType, Location
 from surepy.entities.devices import Hub as SureHub, SurepyDevice
 from surepy.entities.pet import Pet as SurePet
-from surepy.enums import EntityType, Location
+from surepy.enums import SURE_MANUFACTURER
 
-# pylint: disable=relative-beyond-top-level
 from . import SurePetcareAPI
-from .const import DOMAIN, SPC, SURE_MANUFACTURER
+from .const import DOMAIN, SPC
+
+_LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 2
 
@@ -33,13 +36,23 @@ async def async_setup_platform(
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: Any
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up config entry Sure PetCare Flaps sensors."""
 
-    entities: list[SurePetcareBinarySensor] = []
+    _LOGGER.debug("Setting up binary sensors")
+    try:
+        spc: SurePetcareAPI = hass.data[DOMAIN][config_entry.entry_id][SPC]
+    except KeyError:
+        _LOGGER.error(
+            "Integration not ready yet. Current data: %s",
+            hass.data.get(DOMAIN, {}),
+        )
+        return
 
-    spc: SurePetcareAPI = hass.data[DOMAIN][SPC]
+    entities: list[SurePetcareBinarySensor] = []
 
     for surepy_entity in spc.coordinator.data.values():
 
@@ -254,3 +267,29 @@ class DeviceConnectivity(SurePetcareBinarySensor):
     def is_on(self) -> bool:
         """Return True if the pet is at home."""
         return bool(self.extra_state_attributes)
+
+
+class BatteryLowSensor(SurePetcareBinarySensor):
+    """Sure Petcare Battery Low Sensor."""
+
+    def __init__(self, coordinator, _id: int) -> None:
+        """Initialize a Sure Petcare battery low sensor."""
+
+        super().__init__(coordinator, _id, None, BinarySensorDeviceClass.BATTERY)
+
+        self._attr_name = f"{self._name} Battery Low"
+        self._attr_unique_id = (
+            f"{self._surepy_entity.household_id}-{self._id}-battery-low"
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the battery is low."""
+
+        device: SurepyDevice
+        low: bool = False
+
+        if device := self._coordinator.data[self._id]:
+            low = device.battery_low
+
+        return low

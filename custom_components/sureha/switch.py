@@ -24,6 +24,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Sure Petcare switches."""
+    _LOGGER.debug("Setting up switches")
     try:
         spc: SurePetcareAPI = hass.data[DOMAIN][config_entry.entry_id][SPC]
     except KeyError:
@@ -34,15 +35,8 @@ async def async_setup_entry(
         return
 
     entities = []
-    _LOGGER.debug("Setting up Sure Petcare switches")
 
     for surepy_entity in spc.coordinator.data.values():
-        _LOGGER.debug(
-            "Found entity: %s (type: %s, id: %s)",
-            surepy_entity.name,
-            surepy_entity.type,
-            surepy_entity.id,
-        )
         if surepy_entity.type == EntityType.PET:
             _LOGGER.debug("Adding indoor-only switch for pet: %s", surepy_entity.name)
             entities.append(IndoorOnlyModeSwitch(spc.coordinator, surepy_entity.id, spc))
@@ -93,7 +87,11 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if indoor only mode is on."""
-        return bool(self.coordinator.data[self._id].indoor_only_mode)
+        try:
+            return bool(self.coordinator.data[self._id].raw_data().get("indoor_only", False))
+        except (KeyError, AttributeError):
+            _LOGGER.warning("Could not get indoor_only state for pet %s", self._id)
+            return False
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the indoor only mode on."""

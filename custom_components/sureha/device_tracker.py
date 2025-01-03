@@ -1,15 +1,18 @@
-"""Device tracker for SureHA pets."""
+"""Support for Sure Petcare Pet Location."""
+from __future__ import annotations
 
 import logging
 from typing import Any
 
-from homeassistant.components.device_tracker.config_entry import ScannerEntity
+from homeassistant.components.device_tracker import SourceType, TrackerEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from surepy.entities import EntityType
 from surepy.entities.pet import Pet as SurePet
 from surepy.enums import Location
 
-# pylint: disable=relative-beyond-top-level
 from . import DOMAIN, SurePetcareAPI
 from .const import SPC
 
@@ -18,10 +21,21 @@ _LOGGER = logging.getLogger(__name__)
 SOURCE_TYPE_FLAP = "flap"
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up the Pet tracker from config entry."""
-
-    spc: SurePetcareAPI = hass.data[DOMAIN][SPC]
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up Sure Petcare device trackers."""
+    _LOGGER.debug("Setting up device trackers")
+    try:
+        spc: SurePetcareAPI = hass.data[DOMAIN][config_entry.entry_id][SPC]
+    except KeyError:
+        _LOGGER.error(
+            "Integration not ready yet. Current data: %s",
+            hass.data.get(DOMAIN, {}),
+        )
+        return
 
     async_add_entities(
         [
@@ -33,7 +47,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     )
 
 
-class SureDeviceTracker(CoordinatorEntity, ScannerEntity):
+class SureDeviceTracker(CoordinatorEntity, TrackerEntity):
     """Pet device tracker."""
 
     _attr_force_update = False
