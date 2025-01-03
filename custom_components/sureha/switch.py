@@ -9,9 +9,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from surepy.entities import SurepyEntity
+from surepy.entities import EntityType
 from surepy.entities.pet import Pet as SurePet
-from surepy.enums import EntityType
 
 from . import SurePetcareAPI
 from .const import DOMAIN, SPC
@@ -56,16 +55,27 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
         self._id = _id
         self._spc: SurePetcareAPI = spc
 
+        if _id is None:
+            raise ValueError("Pet ID is required")
+
         self._surepy_entity: SurePet = self.coordinator.data[self._id]
-        self._attr_name = f"{self._surepy_entity.name} Indoor Only Mode"
-        self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-indoor-only"
-        
-        # Set up device info
+        type_name = self._surepy_entity.type.name.replace("_", " ").title()
+        name: str = (
+            self._surepy_entity.name
+            if self._surepy_entity.name
+            else f"Unnamed {type_name}"
+        )
+
+        # Set up entity attributes
+        self._attr_name = "Indoor Only Mode"
+        self._attr_unique_id = f"{self._id}_indoor_only"
+
+        # Set up device info to match the pet's device
         self._attr_device_info = {
             "identifiers": {(DOMAIN, str(self._id))},
-            "name": self._surepy_entity.name,
+            "name": name,
             "manufacturer": "Sure Petcare",
-            "model": "Pet",
+            "model": type_name,
             "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
         }
 
