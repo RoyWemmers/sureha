@@ -48,6 +48,7 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
     """Sure Petcare Indoor Only Mode Switch."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "indoor_only_mode"
 
     def __init__(self, coordinator, _id: int, spc: SurePetcareAPI) -> None:
         """Initialize the switch."""
@@ -66,11 +67,8 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
             else f"Unnamed {type_name}"
         )
 
-        # Set up entity attributes
-        self._attr_name = "Indoor Only Mode"
-        self._attr_unique_id = f"{self._id}_indoor_only"
-
-        # Set up device info to match the pet's device
+        # Set up unique ID and device info
+        self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-indoor-only"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, str(self._id))},
             "name": name,

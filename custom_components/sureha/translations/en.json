@@ -26,5 +26,12 @@
                 "title": "SureHA Options"
             }
         }
+    },
+    "entity": {
+        "switch": {
+            "indoor_only_mode": {
+                "name": "Indoor only mode"
+            }
+        }
     }
 }
