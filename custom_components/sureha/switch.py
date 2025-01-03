@@ -24,7 +24,14 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Sure Petcare switches."""
-    spc: SurePetcareAPI = hass.data[DOMAIN][config_entry.entry_id][SPC]
+    try:
+        spc: SurePetcareAPI = hass.data[DOMAIN][config_entry.entry_id][SPC]
+    except KeyError:
+        _LOGGER.error(
+            "Integration not ready yet. Current data: %s",
+            hass.data.get(DOMAIN, {}),
+        )
+        return
 
     entities = []
     _LOGGER.debug("Setting up Sure Petcare switches")
@@ -41,7 +48,7 @@ async def async_setup_entry(
             entities.append(IndoorOnlyModeSwitch(spc.coordinator, surepy_entity.id, spc))
 
     _LOGGER.debug("Adding %d switches", len(entities))
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
 class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
@@ -49,6 +56,7 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "indoor_only_mode"
+    _attr_entity_category = None
 
     def __init__(self, coordinator, _id: int, spc: SurePetcareAPI) -> None:
         """Initialize the switch."""

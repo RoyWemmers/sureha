@@ -71,8 +71,10 @@ CATS = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up."""
+    _LOGGER.debug("Setting up Sure Petcare integration")
 
     hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN].setdefault(entry.entry_id, {})
 
     # set option defaults
     if not entry.options:
@@ -103,13 +105,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     spc = SurePetcareAPI(hass, entry, surepy)
 
     async def async_update_data():
-
         try:
-            # asyncio.TimeoutError and aiohttp.ClientError already handled
-
             async with async_timeout.timeout(20):
                 return await spc.async_update_states()
-
         except SurePetcareAuthenticationError as err:
             raise ConfigEntryAuthFailed from err
         except SurePetcareError as err:
@@ -125,7 +123,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await spc.coordinator.async_config_entry_first_refresh()
 
-    hass.data[DOMAIN][SPC] = spc
+    hass.data[DOMAIN][entry.entry_id][SPC] = spc
 
     await spc.async_setup()
 
@@ -150,13 +148,9 @@ class SurePetcareAPI:
 
         self.states: dict[int, Any] = {}
 
-    async def async_update_states(self) -> dict[int, Any]:
+    async def async_update_states(self):
         """Get all devices and their states."""
-        try:
-            async with async_timeout.timeout(SURE_API_TIMEOUT):
-                return await self.surepy.get_entities()
-        except SurePetcareError as err:
-            raise UpdateFailed(f"Error while updating: {err}") from err
+        return await self.surepy.get_entities()
 
     async def set_pet_location(self, pet_id: int, location: Location) -> None:
         """Update the location of a pet."""
@@ -172,50 +166,15 @@ class SurePetcareAPI:
 
     async def async_setup(self) -> None:
         """Set up the Sure Petcare integration."""
-
-        _LOGGER.info("")
-        _LOGGER.info(
-            "%s %s", " \x1b[38;2;255;26;102m·\x1b[0m" * 24, choice(CATS)  # nosec
-        )
-        _LOGGER.info("  🐾   meeowww..! to the SureHA integration!")
-        _LOGGER.info("  🐾     code & issues: https://github.com/benleb/sureha")
-        _LOGGER.info(" \x1b[38;2;255;26;102m·\x1b[0m" * 30)
-        _LOGGER.info("")
+        _LOGGER.debug("Setting up services")
 
         async def handle_set_pet_location(call: Any) -> None:
             """Call when setting pet location."""
             pet_id = int(call.data[ATTR_PET_ID])
-            location = Location[call.data[ATTR_WHERE].upper()]
+            where = call.data[ATTR_WHERE]
 
-            await self.set_pet_location(pet_id, location)
+            await self.set_pet_location(pet_id, Location[where.upper()])
             await self.coordinator.async_request_refresh()
-
-        pet_ids = [
-            entity.id
-            for entity in self.coordinator.data.values()
-            if entity.type == EntityType.PET
-        ]
-
-        pet_location_service_schema = vol.Schema(
-            {
-                vol.Required(ATTR_PET_ID): vol.Any(cv.positive_int, vol.In(pet_ids)),
-                vol.Required(ATTR_WHERE): vol.Any(
-                    cv.string,
-                    vol.In(
-                        [
-                            # https://github.com/PyCQA/pylint/issues/2062
-                            # pylint: disable=no-member
-                            Location.INSIDE.name.title(),
-                            Location.OUTSIDE.name.title(),
-                        ]
-                    ),
-                ),
-            }
-        )
-
-        self.hass.services.async_register(
-            DOMAIN, SERVICE_PET_LOCATION, handle_set_pet_location, schema=pet_location_service_schema
-        )
 
         async def handle_set_lock_state(call: Any) -> None:
             """Call when setting the lock state."""
@@ -224,36 +183,6 @@ class SurePetcareAPI:
 
             await self.set_lock_state(flap_id, state)
             await self.coordinator.async_request_refresh()
-
-        flap_ids = [
-            entity.id
-            for entity in self.coordinator.data.values()
-            if entity.type in [EntityType.CAT_FLAP, EntityType.PET_FLAP]
-        ]
-
-        lock_state_service_schema = vol.Schema(
-            {
-                vol.Required(ATTR_FLAP_ID): vol.All(cv.positive_int, vol.In(flap_ids)),
-                vol.Required(ATTR_LOCK_STATE): vol.All(
-                    cv.string,
-                    vol.Lower,
-                    vol.In(
-                        [
-                            # https://github.com/PyCQA/pylint/issues/2062
-                            # pylint: disable=no-member
-                            LockState.UNLOCKED.name.lower(),
-                            LockState.LOCKED_IN.name.lower(),
-                            LockState.LOCKED_OUT.name.lower(),
-                            LockState.LOCKED_ALL.name.lower(),
-                        ]
-                    ),
-                ),
-            }
-        )
-
-        self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_LOCK_STATE, handle_set_lock_state, schema=lock_state_service_schema
-        )
 
         async def handle_set_indoor_only_mode(call: Any) -> None:
             """Call when setting indoor-only mode."""
@@ -264,7 +193,13 @@ class SurePetcareAPI:
             await self.coordinator.async_request_refresh()
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, handle_set_indoor_only_mode
+            DOMAIN, SERVICE_SET_LOCK_STATE, handle_set_lock_state
         )
 
-        return None
+        self.hass.services.async_register(
+            DOMAIN, SERVICE_PET_LOCATION, handle_set_pet_location
+        )
+
+        self.hass.services.async_register(
+            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, handle_set_indoor_only_mode
+        )
