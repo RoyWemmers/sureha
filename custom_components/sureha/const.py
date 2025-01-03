@@ -1,4 +1,4 @@
-"""Constants for the Sure Petcare component."""
+"""Constants for the Sure Petcare integration."""
 DOMAIN = "sureha"
 
 SPC = "spc"
@@ -13,10 +13,11 @@ SURE_API_TIMEOUT = 60
 SURE_MANUFACTURER = "Sure Petcare"
 
 # batteries
+ATTR_VOLTAGE = "voltage"
 ATTR_VOLTAGE_FULL = "voltage_full"
 ATTR_VOLTAGE_LOW = "voltage_low"
-SURE_BATT_VOLTAGE_FULL = 1.6
-SURE_BATT_VOLTAGE_LOW = 1.25
+SURE_BATT_VOLTAGE_FULL = 6.0
+SURE_BATT_VOLTAGE_LOW = 4.5
 SURE_BATT_VOLTAGE_DIFF = SURE_BATT_VOLTAGE_FULL - SURE_BATT_VOLTAGE_LOW
 
 # services
@@ -27,3 +28,6 @@ ATTR_LOCK_STATE = "lock_state"
 SERVICE_PET_LOCATION = "set_pet_location"
 ATTR_PET_ID = "pet_id"
 ATTR_WHERE = "where"
+
+SERVICE_SET_INDOOR_ONLY_MODE = "set_indoor_only_mode"
+ATTR_ENABLED = "enabled"

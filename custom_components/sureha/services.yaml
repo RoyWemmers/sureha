@@ -33,3 +33,20 @@ set_pet_location:
       required: true
       example: "Inside"
       selector: { select: { options: ["Inside", "Outside"] } }
+set_indoor_only_mode:
+  name: Set Indoor Only Mode
+  description: Enable or disable indoor-only mode for a flap
+  fields:
+    flap_id:
+      name: Flap ID
+      description: Flap ID to set indoor-only mode for
+      required: true
+      example: "123456"
+      selector:
+        text:
+    enabled:
+      name: Enabled
+      description: Whether to enable or disable indoor-only mode
+      required: true
+      selector:
+        boolean: {}
