@@ -18,7 +18,7 @@ from surepy.entities.pet import Pet as SurePet
 from surepy.enums import SURE_MANUFACTURER
 
 from . import SurePetcareAPI
-from .const import DOMAIN, SPC
+from .const import DOMAIN, SPC, SURE_MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,6 +70,9 @@ async def async_setup_entry(
             EntityType.FELAQUA,
         ]:
             entities.append(DeviceConnectivity(spc.coordinator, surepy_entity.id, spc))
+
+        elif surepy_entity.type in [EntityType.CAT_FLAP, EntityType.PET_FLAP]:
+            entities.append(BatteryLowSensor(spc.coordinator, surepy_entity.id))
 
     async_add_entities(entities, True)
 
@@ -269,27 +272,46 @@ class DeviceConnectivity(SurePetcareBinarySensor):
         return bool(self.extra_state_attributes)
 
 
-class BatteryLowSensor(SurePetcareBinarySensor):
+class BatteryLowSensor(CoordinatorEntity, BinarySensorEntity):
     """Sure Petcare Battery Low Sensor."""
 
+    _attr_device_class = BinarySensorDeviceClass.BATTERY
+
     def __init__(self, coordinator, _id: int) -> None:
-        """Initialize a Sure Petcare battery low sensor."""
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._id = _id
+        self._surepy_entity: SurepyDevice = coordinator.data[_id]
 
-        super().__init__(coordinator, _id, None, BinarySensorDeviceClass.BATTERY)
-
-        self._attr_name = f"{self._name} Battery Low"
-        self._attr_unique_id = (
-            f"{self._surepy_entity.household_id}-{self._id}-battery-low"
+        # Set up unique ID and device info
+        type_name = self._surepy_entity.type.name.replace("_", " ").title()
+        name: str = (
+            self._surepy_entity.name
+            if self._surepy_entity.name
+            else f"Unnamed {type_name}"
         )
+
+        self._attr_name = f"{name} Battery Low"
+        self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-battery-low"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, str(self._id))},
+            "name": name,
+            "manufacturer": SURE_MANUFACTURER,
+            "model": type_name,
+            "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._id in self.coordinator.data
 
     @property
     def is_on(self) -> bool:
-        """Return True if the battery is low."""
-
-        device: SurepyDevice
-        low: bool = False
-
-        if device := self._coordinator.data[self._id]:
-            low = device.battery_low
-
-        return low
+        """Return True if battery is low."""
+        try:
+            device: SurepyDevice = self.coordinator.data[self._id]
+            return device.battery_low
+        except (KeyError, AttributeError) as err:
+            _LOGGER.warning("Could not get battery state for device %s: %s", self._id, err)
+            return False
