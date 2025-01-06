@@ -201,22 +201,21 @@ class SurePetcareAPI:
         _LOGGER.debug("Setting up services")
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_LOCK_STATE, self.handle_set_lock_state, schema=None
+            DOMAIN, SERVICE_SET_LOCK_STATE, self.handle_set_lock_state
         )
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_PET_LOCATION, self.handle_set_pet_location, schema=None
+            DOMAIN, SERVICE_PET_LOCATION, self.handle_set_pet_location
         )
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, self.handle_set_indoor_only_mode, schema=None
+            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, self.handle_set_indoor_only_mode
         )
 
         self.hass.services.async_register(
             DOMAIN,
             "async_set_indoor_only_mode",
             self.async_set_indoor_only_mode,
-            description="Set indoor only mode for a pet.",
             fields={
                 "pet_id": {
                     "description": "The ID of the pet to set indoor only mode for.",
