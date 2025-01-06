@@ -1,52 +1,56 @@
 set_lock_state:
   name: Set lock state
-  description: Sets lock state
+  description: Set the lock state of a flap.
   fields:
     flap_id:
       name: Flap ID
-      description: Flap ID to lock/unlock
-      required: true
-      example: "123456"
-      selector:
-        text:
-    lock_state:
-      name: Lock state
-      description: New lock state.
+      description: The ID of the flap to set the lock state for.
+      example: "12345"
       required: true
       selector:
-        select:
-          { options: ["locked_all", "locked_in", "locked_out", "unlocked"] }
+        text: {}
+    state:
+      name: State
+      description: The lock state to set.
+      example: "LOCKED_IN"
+      required: true
+      selector:
+        text: {}
+
 set_pet_location:
-  name: Set Pet location
-  description: Sets the location of a pet
+  name: Set pet location
+  description: Set the location of a pet.
   fields:
     pet_id:
       name: Pet ID
-      description: Pet ID to set the location for
+      description: The ID of the pet to set the location for.
+      example: "12345"
       required: true
-      example: 31337
       selector:
-        text:
+        text: {}
     where:
       name: Location
-      description: Current location of the pet
+      description: The location to set.
+      example: "INSIDE"
       required: true
-      example: "Inside"
-      selector: { select: { options: ["Inside", "Outside"] } }
+      selector:
+        text: {}
+
 set_indoor_only_mode:
-  name: Set Indoor Only Mode
-  description: Enable or disable indoor-only mode for a pet
+  name: Set indoor only mode
+  description: Set indoor only mode for a pet.
   fields:
     pet_id:
       name: Pet ID
-      description: Pet ID to set indoor-only mode for
+      description: The ID of the pet to set indoor only mode for.
+      example: "12345"
       required: true
-      example: "31337"
       selector:
-        text:
+        text: {}
     enabled:
       name: Enabled
-      description: Whether to enable or disable indoor-only mode
+      description: Whether to enable or disable indoor only mode.
+      example: true
       required: true
       selector:
         boolean: {}

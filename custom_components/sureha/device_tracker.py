@@ -115,4 +115,4 @@ class SureDeviceTracker(CoordinatorEntity, TrackerEntity):
     @property
     def source_type(self):
         """Return the source type, eg gps or router, of the pet."""
-        return SOURCE_TYPE_FLAP
+        return SourceType.GPS

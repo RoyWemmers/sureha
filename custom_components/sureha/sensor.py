@@ -11,7 +11,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, VOLTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -19,7 +19,13 @@ from surepy.entities import EntityType
 from surepy.entities.devices import SurepyDevice
 
 from . import SurePetcareAPI
-from .const import DOMAIN, SPC
+from .const import (
+    DOMAIN,
+    SPC,
+    SURE_BATT_VOLTAGE_FULL,
+    SURE_BATT_VOLTAGE_LOW,
+    SURE_MANUFACTURER,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,8 +50,11 @@ async def async_setup_entry(
 
     for surepy_entity in spc.coordinator.data.values():
         if surepy_entity.type in [EntityType.CAT_FLAP, EntityType.PET_FLAP]:
-            entities.append(
-                BatterySensor(spc.coordinator, surepy_entity.id)
+            entities.extend(
+                [
+                    BatteryVoltageSensor(spc.coordinator, surepy_entity.id),
+                    BatteryPercentageSensor(spc.coordinator, surepy_entity.id),
+                ]
             )
 
     async_add_entities(entities)
@@ -369,3 +378,106 @@ class BatterySensor(SurePetcareSensor):
             }
 
         return attrs
+
+
+class BatteryVoltageSensor(CoordinatorEntity, SensorEntity):
+    """Sure Petcare Battery Voltage Sensor."""
+
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_native_unit_of_measurement = VOLTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, _id: int) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._id = _id
+        self._surepy_entity: SurepyDevice = coordinator.data[_id]
+
+        # Set up unique ID and device info
+        type_name = self._surepy_entity.type.name.replace("_", " ").title()
+        name: str = (
+            self._surepy_entity.name
+            if self._surepy_entity.name
+            else f"Unnamed {type_name}"
+        )
+
+        self._attr_name = f"{name} Battery Voltage"
+        self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-battery-voltage"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, str(self._id))},
+            "name": name,
+            "manufacturer": SURE_MANUFACTURER,
+            "model": type_name,
+            "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._id in self.coordinator.data
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the state of the sensor."""
+        try:
+            device: SurepyDevice = self.coordinator.data[self._id]
+            return device.battery_voltage
+        except (KeyError, AttributeError) as err:
+            _LOGGER.warning("Could not get battery voltage for device %s: %s", self._id, err)
+            return None
+
+
+class BatteryPercentageSensor(CoordinatorEntity, SensorEntity):
+    """Sure Petcare Battery Percentage Sensor."""
+
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, _id: int) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._id = _id
+        self._surepy_entity: SurepyDevice = coordinator.data[_id]
+
+        # Set up unique ID and device info
+        type_name = self._surepy_entity.type.name.replace("_", " ").title()
+        name: str = (
+            self._surepy_entity.name
+            if self._surepy_entity.name
+            else f"Unnamed {type_name}"
+        )
+
+        self._attr_name = f"{name} Battery"
+        self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-battery"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, str(self._id))},
+            "name": name,
+            "manufacturer": SURE_MANUFACTURER,
+            "model": type_name,
+            "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._id in self.coordinator.data
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the state of the sensor."""
+        try:
+            device: SurepyDevice = self.coordinator.data[self._id]
+            voltage = device.battery_voltage
+            if voltage is None:
+                return None
+
+            percentage = (
+                (voltage - SURE_BATT_VOLTAGE_LOW)
+                / (SURE_BATT_VOLTAGE_FULL - SURE_BATT_VOLTAGE_LOW)
+                * 100
+            )
+            return max(0, min(100, round(percentage)))
+        except (KeyError, AttributeError) as err:
+            _LOGGER.warning("Could not get battery percentage for device %s: %s", self._id, err)
+            return None
