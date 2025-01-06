@@ -11,7 +11,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, VOLTAGE
+from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -26,6 +26,9 @@ from .const import (
     SURE_BATT_VOLTAGE_LOW,
     SURE_MANUFACTURER,
 )
+
+# Define VOLTAGE locally as it seems to be missing in the homeassistant.const module.
+VOLTAGE = "V"
 
 _LOGGER = logging.getLogger(__name__)
 
