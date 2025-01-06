@@ -15,7 +15,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from surepy.entities import EntityType, SurepyEntity
 from surepy.entities.devices import Hub as SureHub, SurepyDevice
 from surepy.entities.pet import Pet as SurePet
-from surepy.enums import SURE_MANUFACTURER
 
 from . import SurePetcareAPI
 from .const import DOMAIN, SPC, SURE_MANUFACTURER
