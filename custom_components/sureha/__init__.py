@@ -209,14 +209,6 @@ class SurePetcareAPI:
         await self.set_indoor_only_mode(pet_id, enabled)
         await self.coordinator.async_request_refresh()
 
-    async def async_set_indoor_only_mode(self, call: Any) -> None:
-        """Call when setting indoor-only mode."""
-        pet_id = int(call.data["pet_id"])
-        enabled = call.data["enabled"]
-
-        await self.set_indoor_only_mode(pet_id, enabled)
-        await self.coordinator.async_request_refresh()
-
     async def async_setup(self) -> None:
         """Set up the Sure Petcare integration."""
         _LOGGER.debug("Setting up services")
@@ -240,24 +232,4 @@ class SurePetcareAPI:
             SERVICE_SET_INDOOR_ONLY_MODE,
             self.handle_set_indoor_only_mode,
             schema=SET_INDOOR_ONLY_MODE_SCHEMA,
-        )
-
-        self.hass.services.async_register(
-            DOMAIN,
-            "async_set_indoor_only_mode",
-            self.async_set_indoor_only_mode,
-            fields={
-                "pet_id": {
-                    "description": "The ID of the pet to set indoor only mode for.",
-                    "example": "12345",
-                    "required": True,
-                    "selector": {"text": {}},
-                },
-                "enabled": {
-                    "description": "Whether to enable or disable indoor only mode.",
-                    "example": True,
-                    "required": True,
-                    "selector": {"boolean": {}},
-                },
-            },
         )
