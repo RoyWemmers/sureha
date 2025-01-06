@@ -68,6 +68,27 @@ CATS = [
     "(≗ᆽ ≗)ﾉ",
 ]
 
+SET_LOCK_STATE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_FLAP_ID): cv.string,
+        vol.Required(ATTR_LOCK_STATE): cv.string,
+    }
+)
+
+SET_PET_LOCATION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_PET_ID): cv.string,
+        vol.Required(ATTR_WHERE): cv.string,
+    }
+)
+
+SET_INDOOR_ONLY_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_PET_ID): cv.string,
+        vol.Required(ATTR_ENABLED): cv.boolean,
+    }
+)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up."""
@@ -201,15 +222,24 @@ class SurePetcareAPI:
         _LOGGER.debug("Setting up services")
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_LOCK_STATE, self.handle_set_lock_state
+            DOMAIN,
+            SERVICE_SET_LOCK_STATE,
+            self.handle_set_lock_state,
+            schema=SET_LOCK_STATE_SCHEMA,
         )
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_PET_LOCATION, self.handle_set_pet_location
+            DOMAIN,
+            SERVICE_PET_LOCATION,
+            self.handle_set_pet_location,
+            schema=SET_PET_LOCATION_SCHEMA,
         )
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, self.handle_set_indoor_only_mode
+            DOMAIN,
+            SERVICE_SET_INDOOR_ONLY_MODE,
+            self.handle_set_indoor_only_mode,
+            schema=SET_INDOOR_ONLY_MODE_SCHEMA,
         )
 
         self.hass.services.async_register(
