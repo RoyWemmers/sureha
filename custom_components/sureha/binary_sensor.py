@@ -12,8 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from surepy.entities import EntityType
-from surepy.entities.devices.base import SurepyDevice
+from surepy.entities import EntityType, SurepyEntity
 from surepy.entities.pet import Pet as SurePet
 from surepy.enums import Location
 
@@ -177,7 +176,7 @@ class Hub(SurePetcareBinarySensor):
     def is_on(self) -> bool:
         """Return True if the hub is on."""
 
-        hub: SureHub
+        hub: SurepyEntity
         online: bool = False
 
         if hub := self._coordinator.data[self._id]:
@@ -253,7 +252,7 @@ class DeviceConnectivity(SurePetcareBinarySensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the additional attrs."""
 
-        device: SurepyDevice
+        device: SurepyEntity
         attrs: dict[str, Any] = {}
 
         if (device := self._coordinator.data[self._id]) and (
@@ -281,7 +280,7 @@ class BatteryLowSensor(CoordinatorEntity, BinarySensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._id = _id
-        self._surepy_entity: SurepyDevice = coordinator.data[_id]
+        self._surepy_entity: SurepyEntity = coordinator.data[_id]
 
         # Set up unique ID and device info
         type_name = self._surepy_entity.type.name.replace("_", " ").title()
@@ -310,8 +309,8 @@ class BatteryLowSensor(CoordinatorEntity, BinarySensorEntity):
     def is_on(self) -> bool:
         """Return True if battery is low."""
         try:
-            device: SurepyDevice = self.coordinator.data[self._id]
-            return device.battery_low
+            device: SurepyEntity = self.coordinator.data[self._id]
+            return device.raw_data().get("battery", {}).get("low", False)
         except (KeyError, AttributeError) as err:
             _LOGGER.warning("Could not get battery state for device %s: %s", self._id, err)
             return False
