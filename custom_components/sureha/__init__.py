@@ -164,33 +164,41 @@ class SurePetcareAPI:
         """Update the indoor-only mode of a pet."""
         await self.surepy.sac.update_pet_indoor_only_mode(pet_id, enabled)
 
+    async def handle_set_pet_location(self, call: Any) -> None:
+        """Call when setting pet location."""
+        pet_id = int(call.data[ATTR_PET_ID])
+        where = call.data[ATTR_WHERE]
+
+        await self.set_pet_location(pet_id, Location[where.upper()])
+        await self.coordinator.async_request_refresh()
+
+    async def handle_set_lock_state(self, call: Any) -> None:
+        """Call when setting the lock state."""
+        flap_id = int(call.data[ATTR_FLAP_ID])
+        state = call.data[ATTR_LOCK_STATE]
+
+        await self.set_lock_state(flap_id, state)
+        await self.coordinator.async_request_refresh()
+
+    async def handle_set_indoor_only_mode(self, call: Any) -> None:
+        """Call when setting indoor-only mode."""
+        pet_id = int(call.data[ATTR_PET_ID])
+        enabled = call.data[ATTR_ENABLED]
+
+        await self.set_indoor_only_mode(pet_id, enabled)
+        await self.coordinator.async_request_refresh()
+
+    async def async_set_indoor_only_mode(self, call: Any) -> None:
+        """Call when setting indoor-only mode."""
+        pet_id = int(call.data["pet_id"])
+        enabled = call.data["enabled"]
+
+        await self.set_indoor_only_mode(pet_id, enabled)
+        await self.coordinator.async_request_refresh()
+
     async def async_setup(self) -> None:
         """Set up the Sure Petcare integration."""
         _LOGGER.debug("Setting up services")
-
-        async def handle_set_pet_location(call: Any) -> None:
-            """Call when setting pet location."""
-            pet_id = int(call.data[ATTR_PET_ID])
-            where = call.data[ATTR_WHERE]
-
-            await self.set_pet_location(pet_id, Location[where.upper()])
-            await self.coordinator.async_request_refresh()
-
-        async def handle_set_lock_state(call: Any) -> None:
-            """Call when setting the lock state."""
-            flap_id = int(call.data[ATTR_FLAP_ID])
-            state = call.data[ATTR_LOCK_STATE]
-
-            await self.set_lock_state(flap_id, state)
-            await self.coordinator.async_request_refresh()
-
-        async def handle_set_indoor_only_mode(call: Any) -> None:
-            """Call when setting indoor-only mode."""
-            pet_id = int(call.data[ATTR_PET_ID])
-            enabled = call.data[ATTR_ENABLED]
-
-            await self.set_indoor_only_mode(pet_id, enabled)
-            await self.coordinator.async_request_refresh()
 
         self.hass.services.async_register(
             DOMAIN, SERVICE_SET_LOCK_STATE, self.handle_set_lock_state, schema=None
@@ -224,11 +232,3 @@ class SurePetcareAPI:
                 },
             },
         )
-
-    async def async_set_indoor_only_mode(self, call: Any) -> None:
-        """Call when setting indoor-only mode."""
-        pet_id = int(call.data["pet_id"])
-        enabled = call.data["enabled"]
-
-        await self.set_indoor_only_mode(pet_id, enabled)
-        await self.coordinator.async_request_refresh()
