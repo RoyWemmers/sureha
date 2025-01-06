@@ -12,7 +12,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from surepy.entities import EntityType, SurepyDevice
+from surepy.entities import EntityType
+from surepy.entities.devices.base import SurepyDevice
 from surepy.entities.pet import Pet as SurePet
 from surepy.enums import Location
 
