@@ -193,15 +193,15 @@ class SurePetcareAPI:
             await self.coordinator.async_request_refresh()
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_LOCK_STATE, handle_set_lock_state
+            DOMAIN, SERVICE_SET_LOCK_STATE, handle_set_lock_state, schema=None
         )
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_PET_LOCATION, handle_set_pet_location
+            DOMAIN, SERVICE_PET_LOCATION, handle_set_pet_location, schema=None
         )
 
         self.hass.services.async_register(
-            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, handle_set_indoor_only_mode
+            DOMAIN, SERVICE_SET_INDOOR_ONLY_MODE, handle_set_indoor_only_mode, schema=None
         )
 
         self.hass.services.async_register(
