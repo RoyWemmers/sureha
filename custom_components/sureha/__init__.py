@@ -1,25 +1,32 @@
-"""The surepetcare integration."""
+"""Support for Sure Petcare cat/pet flaps."""
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
-from random import choice
+from datetime import timedelta
 from typing import Any
 
 import async_timeout
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME, Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import DeviceRegistry as dr
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+import voluptuous as vol
 from surepy import Surepy
+from surepy.client import SureAPIClient
+from surepy.const import BASE_RESOURCE
 from surepy.entities import SurepyEntity
+from surepy.entities.pet import Pet
 from surepy.enums import EntityType, Location, LockState
 from surepy.exceptions import SurePetcareAuthenticationError, SurePetcareError
-import voluptuous as vol
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_PASSWORD, CONF_TOKEN, CONF_USERNAME, Platform
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ATTR_ENABLED,
@@ -29,41 +36,25 @@ from .const import (
     ATTR_VOLTAGE_FULL,
     ATTR_VOLTAGE_LOW,
     ATTR_WHERE,
-    BASE_RESOURCE,
     DOMAIN,
+    PLATFORMS,
+    SCAN_INTERVAL,
     SERVICE_PET_LOCATION,
     SERVICE_SET_INDOOR_ONLY_MODE,
     SERVICE_SET_LOCK_STATE,
-    SPC,
     SURE_API_TIMEOUT,
     SURE_BATT_VOLTAGE_FULL,
     SURE_BATT_VOLTAGE_LOW,
+    SURE_MANUFACTURER,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.SWITCH]
-SCAN_INTERVAL = timedelta(minutes=3)
-
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            vol.All(
-                {
-                    vol.Required(CONF_USERNAME): cv.string,
-                    vol.Required(CONF_PASSWORD): cv.string,
-                    vol.Optional(ATTR_VOLTAGE_FULL, default=SURE_BATT_VOLTAGE_FULL): cv.positive_float,
-                    vol.Optional(ATTR_VOLTAGE_LOW, default=SURE_BATT_VOLTAGE_LOW): cv.positive_float,
-                }
-            )
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
+SPC = "spc"
 
 CATS = [
     "/ᐠ｡▿｡ᐟ\\*ᵖᵘʳʳ",
-    "/ᐠ_ꞈ_ᐟ\\ɴʏᴀ~",
+    "/ᐠ_ꞈ_ᐟ\\ɴʸᴀ~",
     "/ᐠ ._. ᐟ\\ﾉ",
     "/ᐠ. ｡.ᐟ\\ᵐᵉᵒʷˎˊ",
     "ᶠᵉᵉᵈ ᵐᵉ /ᐠ-ⱉ-ᐟ\\ﾉ",
@@ -72,24 +63,36 @@ CATS = [
 
 SET_LOCK_STATE_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_FLAP_ID): cv.string,
-        vol.Required(ATTR_LOCK_STATE): cv.string,
+        vol.Required(ATTR_FLAP_ID): vol.Coerce(str),
+        vol.Required(ATTR_LOCK_STATE): vol.Coerce(str),
     }
 )
 
 SET_PET_LOCATION_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_PET_ID): cv.string,
-        vol.Required(ATTR_WHERE): cv.string,
+        vol.Required(ATTR_PET_ID): vol.Coerce(str),
+        vol.Required(ATTR_WHERE): vol.Coerce(str),
     }
 )
 
 SET_INDOOR_ONLY_MODE_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_PET_ID): cv.string,
-        vol.Required(ATTR_ENABLED): cv.boolean,
+        vol.Required(ATTR_PET_ID): vol.Coerce(str),
+        vol.Required(ATTR_ENABLED): vol.Coerce(bool),
     }
 )
+
+
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
+    """Set up the Sure Petcare component."""
+    hass.data.setdefault(DOMAIN, {})
+
+    if DOMAIN not in config:
+        return True
+
+    _LOGGER.debug("Setting up Sure Petcare component")
+
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -147,6 +150,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await spc.coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id][SPC] = spc
+
+    # Register services
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_LOCK_STATE,
+        spc.handle_set_lock_state,
+        schema=SET_LOCK_STATE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_PET_LOCATION,
+        spc.handle_set_pet_location,
+        schema=SET_PET_LOCATION_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_INDOOR_ONLY_MODE,
+        spc.handle_set_indoor_only_mode,
+        schema=SET_INDOOR_ONLY_MODE_SCHEMA,
+    )
 
     await spc.async_setup()
 
@@ -208,36 +231,49 @@ class SurePetcareAPI:
         """Update the lock state of a flap."""
         await self.surepy.sac.update_flap_lock_state(flap_id, LockState[state.upper()])
 
-    async def set_indoor_only_mode(self, pet_id: int, enabled: bool) -> None:
-        """Update the indoor-only mode of a pet."""
+    async def set_indoor_only_mode(self, device_id: int, tag_id: int, enabled: bool) -> None:
+        """Set indoor only mode for a pet.
+
+        Args:
+            device_id (int): The ID of the device
+            tag_id (int): The ID of the pet's tag
+            enabled (bool): True to enable indoor only mode, False to disable
+        """
+        _LOGGER.debug("Setting indoor-only mode for device %s and tag %s to %s", device_id, tag_id, enabled)
+        profile = 3 if enabled else 2
+        resource = f"{BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
+        data = {"profile": profile}
+        _LOGGER.debug("Making API call to %s with data: %s", resource, data)
+        response = await self.surepy.sac.call(method="PUT", resource=resource, data=data)
+        _LOGGER.debug("API response: %s", response)
+
+    async def set_indoor_only(self, pet_id: int, enabled: bool) -> None:
+        """Set indoor-only mode for a pet."""
         _LOGGER.debug("Setting indoor-only mode to %s for pet %s", enabled, pet_id)
+        
+        # Get the pet data
+        pet_data = self.coordinator.data[pet_id]
+        raw_data = pet_data.raw_data()
+        
+        # Get the device and tag IDs
+        tag_id = raw_data.get('tag_id')
+        device_id = raw_data.get('status', {}).get('activity', {}).get('device_id')
+        
+        if not tag_id or not device_id:
+            _LOGGER.error("Could not find tag_id or device_id for pet %s", pet_id)
+            return
+        
+        # Set the profile (3 for indoor-only, 1 for normal)
+        profile = 3 if enabled else 1
+        resource = f"{BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
+        data = {"profile": profile}
+        
         try:
-            entities = await self.surepy.get_entities()
-            if pet_id in entities:
-                pet = entities[pet_id]
-                raw_data = pet.raw_data()
-                _LOGGER.debug("Pet data: %s", raw_data)
-                
-                tag_id = raw_data.get('tag_id')
-                device_id = raw_data.get('status', {}).get('activity', {}).get('device_id')
-                
-                if tag_id and device_id:
-                    _LOGGER.debug("Updating indoor-only mode for device %s and tag %s", device_id, tag_id)
-                    try:
-                        # Update the tag profile
-                        profile = 3 if enabled else 2
-                        resource = f"{BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
-                        data = {"profile": profile}
-                        _LOGGER.debug("Making API call to %s with data: %s", resource, data)
-                        response = await self.surepy.sac.call(method="PUT", resource=resource, data=data)
-                        _LOGGER.debug("API response: %s", response)
-                        _LOGGER.debug("Successfully updated indoor-only mode")
-                    except Exception as err:
-                        _LOGGER.error("Failed to update indoor-only mode: %s", err)
-                else:
-                    _LOGGER.error("Could not find tag_id or device_id for pet %s", pet_id)
+            await self.surepy.sac.call(method="PUT", resource=resource, data=data)
+            _LOGGER.debug("Successfully set indoor-only mode to %s for pet %s", enabled, pet_id)
         except Exception as err:
-            _LOGGER.error("Error in set_indoor_only_mode: %s", err)
+            _LOGGER.error("Failed to set indoor-only mode: %s", err)
+            raise
 
     async def handle_set_pet_location(self, call: Any) -> None:
         """Call when setting pet location."""
@@ -260,30 +296,9 @@ class SurePetcareAPI:
         pet_id = int(call.data[ATTR_PET_ID])
         enabled = call.data[ATTR_ENABLED]
 
-        await self.set_indoor_only_mode(pet_id, enabled)
+        await self.set_indoor_only(pet_id, enabled)
         await self.coordinator.async_request_refresh()
 
     async def async_setup(self) -> None:
         """Set up the Sure Petcare integration."""
         _LOGGER.debug("Setting up services")
-
-        self.hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_LOCK_STATE,
-            self.handle_set_lock_state,
-            schema=SET_LOCK_STATE_SCHEMA,
-        )
-
-        self.hass.services.async_register(
-            DOMAIN,
-            SERVICE_PET_LOCATION,
-            self.handle_set_pet_location,
-            schema=SET_PET_LOCATION_SCHEMA,
-        )
-
-        self.hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_INDOOR_ONLY_MODE,
-            self.handle_set_indoor_only_mode,
-            schema=SET_INDOOR_ONLY_MODE_SCHEMA,
-        )

@@ -1,11 +1,11 @@
 {
     "domain": "sureha",
     "name": "SureHA",
-    "version": "0.7.18",
+    "version": "0.7.19",
     "documentation": "https://github.com/RoyWemmers/sureha",
     "issue_tracker": "https://github.com/RoyWemmers/sureha/issues",
     "config_flow": true,
-    "dependencies": [],
+    "dependencies": ["http"],
     "codeowners": ["@RoyWemmers"],
     "requirements": ["surepy @ git+https://github.com/RoyWemmers/surepy.git@0.9.1"],
     "iot_class": "cloud_polling"

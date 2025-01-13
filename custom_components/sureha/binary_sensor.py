@@ -16,8 +16,8 @@ from surepy.entities import EntityType, SurepyEntity
 from surepy.entities.pet import Pet as SurePet
 from surepy.enums import Location
 
-from . import SurePetcareAPI
-from .const import DOMAIN, SPC, SURE_MANUFACTURER
+from . import SurePetcareAPI, SPC
+from .const import DOMAIN, SURE_MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 

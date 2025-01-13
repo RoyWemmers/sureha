@@ -1,8 +1,8 @@
 """Support for Sure Petcare Flap sensors."""
-
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -11,24 +11,22 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfElectricPotential
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from surepy.entities import EntityType
-from surepy.entities.devices import SurepyDevice
+from homeassistant.util import dt
+from surepy.entities import EntityType, SurepyEntity
+from surepy.entities.pet import Pet as SurePet
+from surepy.enums import LockState
 
-from . import SurePetcareAPI
+from . import SurePetcareAPI, SPC
 from .const import (
+    ATTR_VOLTAGE_FULL,
+    ATTR_VOLTAGE_LOW,
     DOMAIN,
-    SPC,
-    SURE_BATT_VOLTAGE_FULL,
-    SURE_BATT_VOLTAGE_LOW,
     SURE_MANUFACTURER,
 )
-
-# Define VOLTAGE locally as it seems to be missing in the homeassistant.const module.
-VOLTAGE = "V"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -387,7 +385,7 @@ class BatteryVoltageSensor(CoordinatorEntity, SensorEntity):
     """Sure Petcare Battery Voltage Sensor."""
 
     _attr_device_class = SensorDeviceClass.VOLTAGE
-    _attr_native_unit_of_measurement = VOLTAGE
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator, _id: int) -> None:
@@ -476,8 +474,8 @@ class BatteryPercentageSensor(CoordinatorEntity, SensorEntity):
                 return None
 
             percentage = (
-                (voltage - SURE_BATT_VOLTAGE_LOW)
-                / (SURE_BATT_VOLTAGE_FULL - SURE_BATT_VOLTAGE_LOW)
+                (voltage - ATTR_VOLTAGE_LOW)
+                / (ATTR_VOLTAGE_FULL - ATTR_VOLTAGE_LOW)
                 * 100
             )
             return max(0, min(100, round(percentage)))

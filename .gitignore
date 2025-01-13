@@ -1,2 +1,16 @@
 mypy.ini
 pyproject.toml
+
+# Home Assistant config files
+config/*
+!config/configuration.yaml
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+.venv
+env/
+venv/

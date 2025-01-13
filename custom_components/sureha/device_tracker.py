@@ -1,7 +1,8 @@
-"""Support for Sure Petcare Pet Location."""
+"""Support for Sure Petcare Flap sensors."""
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.components.device_tracker import SourceType, TrackerEntity
 from homeassistant.config_entries import ConfigEntry
@@ -9,10 +10,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from surepy.entities import EntityType
+from surepy.entities.pet import Pet as SurePet
 from surepy.enums import Location
 
-from . import SurePetcareAPI
-from .const import DOMAIN, SPC
+from . import SurePetcareAPI, SPC
+from .const import DOMAIN, SURE_MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
