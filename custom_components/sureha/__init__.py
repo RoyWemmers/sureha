@@ -190,7 +190,15 @@ class SurePetcareAPI:
                 device_id = pet.tag.get('device_id')
                 tag_id = pet.tag.get('id')
                 if device_id and tag_id:
-                    await self.surepy.client.set_indoor_only(device_id, tag_id, enabled)
+                    # First remove the tag from the device
+                    if not enabled:
+                        await self.surepy.client._remove_tag_from_device(device_id, tag_id)
+                    # Then add it back with the indoor_only setting
+                    await self.surepy.client._add_tag_to_device(device_id, tag_id)
+                    # Update the tag settings
+                    resource = f"{self.surepy.client.BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
+                    data = {"indoor_only": enabled}
+                    await self.surepy.client.call(method="PUT", resource=resource, json=data)
 
     async def handle_set_pet_location(self, call: Any) -> None:
         """Call when setting pet location."""
