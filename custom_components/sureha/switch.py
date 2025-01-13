@@ -62,12 +62,11 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
             raise ValueError("Pet ID is required")
 
         self._surepy_entity: SurePet = self.coordinator.data[self._id]
-        type_name = self._surepy_entity.type.name.replace("_", " ").title()
-        name: str = (
-            self._surepy_entity.name
-            if self._surepy_entity.name
-            else f"Unnamed {type_name}"
-        )
+        pet_data = self._surepy_entity.raw_data()
+        name = self._surepy_entity.name if self._surepy_entity.name else "Unnamed Pet"
+        model = "Pet"
+        if tag_id := pet_data.get("tag_id"):
+            model = f"{model} ({tag_id})"
 
         # Set up unique ID and device info
         self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-indoor-only"
@@ -75,7 +74,7 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
             "identifiers": {(DOMAIN, str(self._id))},
             "name": name,
             "manufacturer": "Sure Petcare",
-            "model": f"Pet ({self._surepy_entity.raw_data().get('tag_id')})" if self._surepy_entity.raw_data().get('tag_id') else "Pet",
+            "model": model,
             "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
         }
 

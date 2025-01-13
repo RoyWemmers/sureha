@@ -196,7 +196,6 @@ class Pet(SurePetcareBinarySensor):
 
     def __init__(self, coordinator, _id: int, spc: SurePetcareAPI) -> None:
         """Initialize a Sure Petcare Pet."""
-
         super().__init__(coordinator, _id, spc, BinarySensorDeviceClass.PRESENCE)
 
         # explicit typing
@@ -205,15 +204,20 @@ class Pet(SurePetcareBinarySensor):
         # picture of the pet that can be added via the sure app/website
         self._attr_entity_picture = self._surepy_entity.photo_url
 
-        # Override the device info to include the tag ID
-        if self._attr_device_info:
-            pet_data = self._surepy_entity.raw_data()
-            model = f"Pet"
-            if tag_id := pet_data.get("tag_id"):
-                model = f"{model} ({tag_id})"
-            self._attr_device_info["model"] = model
-            # Use string ID for consistency
-            self._attr_device_info["identifiers"] = {(DOMAIN, str(self._id))}
+        # Set device info
+        pet_data = self._surepy_entity.raw_data()
+        name = self._surepy_entity.name if self._surepy_entity.name else "Unnamed Pet"
+        model = "Pet"
+        if tag_id := pet_data.get("tag_id"):
+            model = f"{model} ({tag_id})"
+
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, str(self._id))},
+            "name": name,
+            "manufacturer": "Sure Petcare",
+            "model": model,
+            "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
+        }
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
