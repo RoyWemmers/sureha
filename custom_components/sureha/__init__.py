@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceRegistry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from surepy import Surepy
 from surepy.entities import SurepyEntity
@@ -28,6 +29,7 @@ from .const import (
     ATTR_VOLTAGE_FULL,
     ATTR_VOLTAGE_LOW,
     ATTR_WHERE,
+    BASE_RESOURCE,
     DOMAIN,
     SERVICE_PET_LOCATION,
     SERVICE_SET_INDOOR_ONLY_MODE,
@@ -153,6 +155,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle removal of an entry."""
+    _LOGGER.debug("Removing Sure Petcare integration")
+    
+    # Get the device registry
+    device_registry = dr.async_get(hass)
+    
+    # Find all devices associated with this config entry
+    devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+    
+    # Remove all devices
+    for device in devices:
+        _LOGGER.debug("Removing device: %s", device.id)
+        device_registry.async_remove_device(device.id)
+
+
 class SurePetcareAPI:
     """Define a generic Sure Petcare object."""
 
@@ -183,21 +210,34 @@ class SurePetcareAPI:
 
     async def set_indoor_only_mode(self, pet_id: int, enabled: bool) -> None:
         """Update the indoor-only mode of a pet."""
-        entities = await self.surepy.get_entities()
-        if pet_id in entities:
-            pet = entities[pet_id]
-            if hasattr(pet, 'tag') and pet.tag:
-                device_id = pet.tag.get('device_id')
-                tag_id = pet.tag.get('id')
-                if device_id and tag_id:
-                    # First remove the tag from the device
-                    await self.surepy.client._remove_tag_from_device(device_id, tag_id)
-                    # Then update the tag settings
-                    resource = f"{self.surepy.client.BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
-                    data = {"indoor_only": enabled}
-                    await self.surepy.client.call(method="PUT", resource=resource, json=data)
-                    # Finally, add the tag back to the device
-                    await self.surepy.client._add_tag_to_device(device_id, tag_id)
+        _LOGGER.debug("Setting indoor-only mode to %s for pet %s", enabled, pet_id)
+        try:
+            entities = await self.surepy.get_entities()
+            if pet_id in entities:
+                pet = entities[pet_id]
+                raw_data = pet.raw_data()
+                _LOGGER.debug("Pet data: %s", raw_data)
+                
+                tag_id = raw_data.get('tag_id')
+                device_id = raw_data.get('status', {}).get('activity', {}).get('device_id')
+                
+                if tag_id and device_id:
+                    _LOGGER.debug("Updating indoor-only mode for device %s and tag %s", device_id, tag_id)
+                    try:
+                        # Update the tag profile
+                        profile = 3 if enabled else 2
+                        resource = f"{BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
+                        data = {"profile": profile}
+                        _LOGGER.debug("Making API call to %s with data: %s", resource, data)
+                        response = await self.surepy.sac.call(method="PUT", resource=resource, data=data)
+                        _LOGGER.debug("API response: %s", response)
+                        _LOGGER.debug("Successfully updated indoor-only mode")
+                    except Exception as err:
+                        _LOGGER.error("Failed to update indoor-only mode: %s", err)
+                else:
+                    _LOGGER.error("Could not find tag_id or device_id for pet %s", pet_id)
+        except Exception as err:
+            _LOGGER.error("Error in set_indoor_only_mode: %s", err)
 
     async def handle_set_pet_location(self, call: Any) -> None:
         """Call when setting pet location."""

@@ -120,12 +120,12 @@ class SurePetcareBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def device_info(self):
-
-        device = {}
-
+        """Return device info."""
         try:
-
-            model = f"{self._surepy_entity.type.name.replace('_', ' ').title()}"
+            type_name = self._surepy_entity.type.name.replace("_", " ").title()
+            name = self._surepy_entity.name if self._surepy_entity.name else f"Unnamed {type_name}"
+            model = type_name
+            
             if serial := self._surepy_entity.raw_data().get("serial_number"):
                 model = f"{model} ({serial})"
             elif mac_address := self._surepy_entity.raw_data().get("mac_address"):
@@ -133,31 +133,16 @@ class SurePetcareBinarySensor(CoordinatorEntity, BinarySensorEntity):
             elif tag_id := self._surepy_entity.raw_data().get("tag_id"):
                 model = f"{model} ({tag_id})"
 
-            device = {
-                "identifiers": {(DOMAIN, self._id)},
-                "name": self._surepy_entity.name.capitalize(),
+            return {
+                "identifiers": {(DOMAIN, str(self._id))},
+                "name": name,
                 "manufacturer": SURE_MANUFACTURER,
                 "model": model,
+                "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
             }
-
-            if self._state:
-                versions = self._state.get("version", {})
-
-                if dev_fw_version := versions.get("device", {}).get("firmware"):
-                    device["sw_version"] = dev_fw_version
-
-                if (lcd_version := versions.get("lcd", {})) and (
-                    rf_version := versions.get("rf", {})
-                ):
-                    device["sw_version"] = (
-                        f"lcd: {lcd_version.get('version', lcd_version)['firmware']} | "
-                        f"fw: {rf_version.get('version', rf_version)['firmware']}"
-                    )
-
-        except AttributeError:
-            pass
-
-        return device
+        except (KeyError, AttributeError) as err:
+            _LOGGER.debug("Could not get device info for entity %s: %s", self._id, err)
+            return None
 
 
 class Hub(SurePetcareBinarySensor):
@@ -206,15 +191,17 @@ class Pet(SurePetcareBinarySensor):
 
         # Set device info
         pet_data = self._surepy_entity.raw_data()
-        name = self._surepy_entity.name if self._surepy_entity.name else "Unnamed Pet"
-        model = "Pet"
+        type_name = self._surepy_entity.type.name.replace("_", " ").title()
+        name: str = self._surepy_entity.name if self._surepy_entity.name else f"Unnamed {type_name}"
+        model = type_name
         if tag_id := pet_data.get("tag_id"):
             model = f"{model} ({tag_id})"
 
+        self._attr_name = f"{name} Presence"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, str(self._id))},
             "name": name,
-            "manufacturer": "Sure Petcare",
+            "manufacturer": SURE_MANUFACTURER,
             "model": model,
             "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
         }

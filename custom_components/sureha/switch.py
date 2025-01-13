@@ -13,7 +13,7 @@ from surepy.entities import EntityType
 from surepy.entities.pet import Pet as SurePet
 
 from . import SurePetcareAPI
-from .const import DOMAIN, SPC
+from .const import DOMAIN, SPC, BASE_RESOURCE, SURE_MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,17 +63,21 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
 
         self._surepy_entity: SurePet = self.coordinator.data[self._id]
         pet_data = self._surepy_entity.raw_data()
-        name = self._surepy_entity.name if self._surepy_entity.name else "Unnamed Pet"
-        model = "Pet"
+        
+        # Set up name and model
+        type_name = self._surepy_entity.type.name.replace("_", " ").title()
+        name: str = self._surepy_entity.name if self._surepy_entity.name else f"Unnamed {type_name}"
+        model = type_name
         if tag_id := pet_data.get("tag_id"):
             model = f"{model} ({tag_id})"
 
         # Set up unique ID and device info
         self._attr_unique_id = f"{self._surepy_entity.household_id}-{self._id}-indoor-only"
+        self._attr_name = f"{name} Indoor Only Mode"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, str(self._id))},
             "name": name,
-            "manufacturer": "Sure Petcare",
+            "manufacturer": SURE_MANUFACTURER,
             "model": model,
             "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
         }
@@ -84,13 +88,26 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
         return self._id in self.coordinator.data
 
     @property
-    def is_on(self) -> bool:
+    async def async_is_on(self) -> bool:
         """Return true if indoor only mode is on."""
         try:
             pet_data = self.coordinator.data[self._id]
             raw_data = pet_data.raw_data()
             _LOGGER.debug("Pet %s raw data: %s", self._id, raw_data)
-            return bool(raw_data.get("indoor_only", False))
+            
+            # Get the device and tag IDs
+            tag_id = raw_data.get('tag_id')
+            device_id = raw_data.get('status', {}).get('activity', {}).get('device_id')
+            
+            if tag_id and device_id:
+                # Get the tag settings from the API
+                resource = f"{BASE_RESOURCE}/device/{device_id}/tag/{tag_id}"
+                response = await self._spc.surepy.sac.call(method="GET", resource=resource)
+                _LOGGER.debug("Tag settings response: %s", response)
+                
+                # Profile 3 means indoor-only mode is enabled
+                return response.get('data', {}).get('profile') == 3
+            return False
         except (KeyError, AttributeError) as err:
             _LOGGER.warning("Could not get indoor_only state for pet %s: %s", self._id, err)
             return False
