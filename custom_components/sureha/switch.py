@@ -75,7 +75,7 @@ class IndoorOnlyModeSwitch(CoordinatorEntity, SwitchEntity):
             "identifiers": {(DOMAIN, str(self._id))},
             "name": name,
             "manufacturer": "Sure Petcare",
-            "model": type_name,
+            "model": f"Pet ({self._surepy_entity.raw_data().get('tag_id')})" if self._surepy_entity.raw_data().get('tag_id') else "Pet",
             "via_device": (DOMAIN, f"household_{self._surepy_entity.household_id}"),
         }
 

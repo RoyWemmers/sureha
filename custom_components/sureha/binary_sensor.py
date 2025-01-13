@@ -205,6 +205,16 @@ class Pet(SurePetcareBinarySensor):
         # picture of the pet that can be added via the sure app/website
         self._attr_entity_picture = self._surepy_entity.photo_url
 
+        # Override the device info to include the tag ID
+        if self._attr_device_info:
+            pet_data = self._surepy_entity.raw_data()
+            model = f"Pet"
+            if tag_id := pet_data.get("tag_id"):
+                model = f"{model} ({tag_id})"
+            self._attr_device_info["model"] = model
+            # Use string ID for consistency
+            self._attr_device_info["identifiers"] = {(DOMAIN, str(self._id))}
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the additional attrs."""
