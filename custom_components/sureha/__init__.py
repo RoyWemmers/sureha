@@ -183,7 +183,7 @@ class SurePetcareAPI:
 
     async def set_indoor_only_mode(self, pet_id: int, enabled: bool) -> None:
         """Update the indoor-only mode of a pet."""
-        await self.surepy.sac.set_pet_indoor_only_mode(pet_id, enabled)
+        await self.surepy.sac.set_indoor_only(pet_id, pet_id, enabled)
 
     async def handle_set_pet_location(self, call: Any) -> None:
         """Call when setting pet location."""
